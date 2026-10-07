@@ -47,3 +47,8 @@ Build command: `npm run build`; output directory: `dist`.
 A branded 1200 × 630 PNG is included at `/social-preview.png`, with editable SVG source alongside it. Once the final site address is known, set `og:image` and `twitter:image` to its absolute HTTPS image URL and add `og:url` and a canonical URL. Do not use the localhost address.
 
 Email copying, keyboard focus, internal targets, and mouse-triggered portrait loading were checked in the browser. A reliable phone-sized screenshot could not be captured with this browser session; verify 320–430 px widths on a phone before deployment. Confirm education, experience, and project stack details personally; supply an actual resume PDF before adding a download.
+
+
+## GitHub Pages
+
+Select Settings → Pages → Source → GitHub Actions. The pages.yml workflow builds on pushes to main, using the Pages base path automatically. Runtime image paths use Vite BASE_URL so both /porfolio/ on GitHub Pages and / on Cloudflare work. For a manual Pages build use `npm run build -- --base=/porfolio/`.
