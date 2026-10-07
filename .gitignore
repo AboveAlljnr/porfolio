@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.python-deps/
+__pycache__/
+contact-sheet.jpg
