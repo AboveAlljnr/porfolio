@@ -9,23 +9,6 @@
 @media(max-width:1000px){.hero-copy{max-width:440px}.hero-copy .bio{font-size:15px}}
 @media(max-width:620px){.hero-copy{max-width:86%;bottom:12%}.hero-copy .intro{font-size:15px}.hero-copy h1{font-size:clamp(76px,20vw,100px)}.hero-copy .hero-identity{font-size:10px}.hero-copy .bio{font-size:14px;line-height:1.7;max-width:340px}.hero-copy .desktop-break{display:none}.hero-actions .pill{font-size:13px;padding:14px 20px;gap:20px}}
 @media(max-height:650px) and (min-width:621px){.hero-copy .intro{font-size:14px}.hero-copy h1{font-size:88px}.hero-copy .bio{font-size:14px;margin-bottom:18px}.hero-actions .pill{padding:12px 20px}}
-/* Readability: consistent minimum sizes across content and controls. */
-.floating-header a{font-size:12px;padding:14px 24px}
-.availability{font-size:11px}.portrait-note{font-size:11px}
-.hero-edition{font-size:11px}.scroll-cue span:first-child{font-size:10px}
-.hero-copy .hero-identity{font-size:12px}.hero-copy .bio{font-size:17px}
-.section-label{font-size:12px;line-height:1.6}
-.content-section p{font-size:17px;line-height:1.8}
-.text-link{font-size:15px}.skills span{font-size:13px}
-.project-meta{font-size:12px;line-height:1.6;letter-spacing:.06em}
-.project h3{font-size:clamp(25px,2.5vw,34px)}
-.project-visit{font-size:14px}.project-tags li{font-size:13px;padding:9px 13px}
-.background>h3{font-size:16px}.background h4{font-size:20px;line-height:1.4}.background p{font-size:16px}
-.expertise-grid h3{font-size:26px}.expertise-tools{font-size:14px;line-height:1.8}
-.contact .pill{font-size:14px}.social-links{font-size:15px}.contact footer{font-size:12px;line-height:1.7;letter-spacing:.04em}.copy-status{font-size:15px}
-@media(max-width:1000px){.portrait-note{font-size:10px}.hero-copy .bio{font-size:16px}}
-@media(max-width:620px){.floating-header a{font-size:11px;padding:12px 15px}.floating-header{left:auto;right:5%;transform:none}.portrait-note{font-size:10px}.hero-copy .hero-identity{font-size:11px}.hero-copy .bio{font-size:15px}.hero-actions .pill{font-size:14px}.scroll-cue span:first-child{font-size:9px}.project-meta{font-size:11px}.content-section p{font-size:16px}.background p{font-size:16px}.project h3{font-size:25px}.contact footer{font-size:11px;flex-wrap:wrap;gap:16px}.expertise-grid h3{font-size:24px}}
-@media(max-height:650px) and (min-width:621px){.hero-copy .bio{font-size:15px}.portrait-note{font-size:10px}}
 .portrait-fallback{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:max(70vw,124.444444svh);height:auto;max-width:none;pointer-events:none}.portrait canvas{position:relative;opacity:0}.project-grid>*{min-width:0}.project h3 a{overflow-wrap:anywhere}.background{min-width:0}.hero-actions a,.social-links a{min-height:44px}.project-image:focus-visible{outline-offset:5px}
 @media(max-width:620px){.hero{min-height:740px}.portrait canvas{height:100%;width:100%}.portrait-fallback{width:max(70vw,calc(max(100svh,740px) * 1.24444444))}.hero-copy{bottom:90px}.hero-copy h1{font-size:clamp(68px,19vw,100px)}.hero-copy .bio{max-width:100%;font-size:16px}.floating-header a{padding:13px 12px}.contact-email{font-size:clamp(18px,5.5vw,26px)}.contact footer{overflow-wrap:anywhere}.content-section{scroll-margin-top:20px}}
 @media(max-width:360px){.floating-header{right:4%}.floating-header a{font-size:10px;padding:13px 9px}.hero-actions .pill{padding:14px 16px;gap:14px}}
