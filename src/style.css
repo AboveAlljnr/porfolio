@@ -26,3 +26,10 @@
 @media(max-width:1000px){.portrait-note{font-size:10px}.hero-copy .bio{font-size:16px}}
 @media(max-width:620px){.floating-header a{font-size:11px;padding:12px 15px}.floating-header{left:auto;right:5%;transform:none}.portrait-note{font-size:10px}.hero-copy .hero-identity{font-size:11px}.hero-copy .bio{font-size:15px}.hero-actions .pill{font-size:14px}.scroll-cue span:first-child{font-size:9px}.project-meta{font-size:11px}.content-section p{font-size:16px}.background p{font-size:16px}.project h3{font-size:25px}.contact footer{font-size:11px;flex-wrap:wrap;gap:16px}.expertise-grid h3{font-size:24px}}
 @media(max-height:650px) and (min-width:621px){.hero-copy .bio{font-size:15px}.portrait-note{font-size:10px}}
+.portrait-fallback{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:max(70vw,124.444444svh);height:auto;max-width:none;pointer-events:none}.portrait canvas{position:relative;opacity:0}.project-grid>*{min-width:0}.project h3 a{overflow-wrap:anywhere}.background{min-width:0}.hero-actions a,.social-links a{min-height:44px}.project-image:focus-visible{outline-offset:5px}
+@media(max-width:620px){.hero{min-height:740px}.portrait canvas{height:100%;width:100%}.portrait-fallback{width:max(70vw,calc(max(100svh,740px) * 1.24444444))}.hero-copy{bottom:90px}.hero-copy h1{font-size:clamp(68px,19vw,100px)}.hero-copy .bio{max-width:100%;font-size:16px}.floating-header a{padding:13px 12px}.contact-email{font-size:clamp(18px,5.5vw,26px)}.contact footer{overflow-wrap:anywhere}.content-section{scroll-margin-top:20px}}
+@media(max-width:360px){.floating-header{right:4%}.floating-header a{font-size:10px;padding:13px 9px}.hero-actions .pill{padding:14px 16px;gap:14px}}
+.portrait-touch-note{display:none}
+@media(hover:none),(pointer:coarse){.hero{touch-action:pan-y pinch-zoom}.portrait-desktop-note{display:none}.portrait-touch-note{display:inline}.portrait-note{color:#fff;font-size:12px}}
+@media(prefers-reduced-motion:reduce){.portrait-touch-note{display:none}.portrait-desktop-note{display:inline}}
+.portrait[data-motion="off"] .portrait-touch-note{display:none}.portrait[data-motion="off"] .portrait-desktop-note{display:inline}

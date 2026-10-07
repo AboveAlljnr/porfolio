@@ -49,71 +49,123 @@ function Portrait() {
   const canvas = useRef(null);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    let disposed = false, raf, observer, measure;
-    const frames = [], point = { x: 0, y: 0, active: false };
+    const el = canvas.current, ctx = el.getContext('2d', { alpha: false });
+    if (!ctx) return;
+    let disposed = false, raf = 0, rect, scene, center, last = null, angle = 0, lastTime = 0;
+    let activeLoads = 0, dragId = null, welcomeTimer = 0;
+    let welcomeCancelled = false;
+    const hero = el.closest('.hero');
+    const frames = new Map(), pending = new Set(), queue = [];
+    const point = { x: 0, y: 0, active: false };
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+    const fine = matchMedia('(hover: hover) and (pointer: fine)');
+    const connection = navigator.connection;
+    const canAnimate = () => !reduced.matches && !connection?.saveData;
+    el.parentElement.dataset.motion=canAnimate() ? 'on' : 'off';
     const load = src => new Promise((resolve, reject) => {
-      const img = new Image(); img.onload = async () => {
-        try { await img.decode(); resolve(img); } catch (error) { reject(error); }
-      }; img.onerror = () => reject(new Error(`Unable to load ${src}`)); img.src = src;
+      const img = new Image();
+      img.onload = async () => { try { await img.decode(); resolve(img); } catch (error) { reject(error); } };
+      img.onerror = reject;
+      img.src = src;
     });
-    const move = e => { point.x = e.clientX; point.y = e.clientY; point.active = true; };
-    const leave = () => { point.active = false; };
-    const start = async () => {
-      const center = await load('/frames/center.webp?v=2');
-      if (disposed) return;
-      const el = canvas.current, ctx = el.getContext('2d', { alpha: false });
-      let rect, angle = 0, last = null, lastTime = 0, scene;
-      measure = () => { rect = el.getBoundingClientRect(); };
-      const resize = () => {
-        measure();
-        const dpr = Math.min(devicePixelRatio || 1, 2);
-        el.width = Math.round(rect.width * dpr); el.height = Math.round(rect.height * dpr);
-        const scale = Math.max(rect.width / center.width, rect.height / center.height) * PORTRAIT_ZOOM;
-        scene = { width: center.width * scale, height: center.height * scale };
-        scene.x = (rect.width - scene.width) / 2;
-        scene.y = rect.height - scene.height;
-        last = null;
-      };
-      const draw = img => {
-        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = '#e00907';
-        ctx.fillRect(0, 0, el.width, el.height);
-        const scale = Math.max(el.width / img.width, el.height / img.height) * PORTRAIT_ZOOM;
-        const w = img.width * scale, h = img.height * scale;
-        ctx.drawImage(img, (el.width-w)/2, el.height-h, w, h);
-      };
-      resize(); draw(center);
-      frames.push(...await Promise.all(Array.from({length:64}, (_,i) => load(`/frames/${String(i).padStart(2,'0')}.webp?v=2`))));
-      if (disposed) return;
-      setReady(true);
-      observer = new ResizeObserver(resize); observer.observe(el);
-      window.addEventListener('scroll', measure, {passive:true});
-      window.addEventListener('resize', measure, {passive:true});
-      const render = time => {
-        // Face position is measured in the source frame, independent of the viewport.
-        const dx = point.x - (rect.left + scene.x + scene.width * 0.5);
-        const dy = point.y - (rect.top + scene.y + scene.height * 0.43);
-        const deadzone = Math.min(innerWidth, innerHeight) * 0.12;
-        let index = -1;
-        if (point.active && !reduced.matches && Math.hypot(dx,dy) > deadzone) {
-          const target = (Math.atan2(dy,dx) + TAU) % TAU;
-          const delta = lastTime ? Math.min(time-lastTime, 50) : 1000/60;
-          angle = lerpAngle(angle, target, 1 - Math.pow(1-0.26, delta/(1000/60)));
-          index = ((Math.round(angle / TAU * 64) % 64) + 64) % 64;
-        }
-        if (index !== last) { draw(index < 0 ? center : frames[index]); el.dataset.frame = index < 0 ? 'center' : String(index); last = index; }
-        lastTime = time; raf = requestAnimationFrame(render);
-      };
-      window.addEventListener('pointermove', move, {passive:true});
-      document.documentElement.addEventListener('pointerleave', leave);
-      window.addEventListener('blur', leave);
-      raf = requestAnimationFrame(render);
+    const draw = img => {
+      if (!img || !scene) return;
+      ctx.fillStyle = '#e00907'; ctx.fillRect(0, 0, el.width, el.height);
+      const scale = Math.max(el.width / img.width, el.height / img.height) * PORTRAIT_ZOOM;
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (el.width-w)/2, el.height-h, w, h);
     };
-    start().catch(error => { console.error('Portrait frames could not load', error); });
-    return () => { disposed = true; cancelAnimationFrame(raf); observer?.disconnect(); if (measure) { window.removeEventListener('scroll', measure); window.removeEventListener('resize', measure); } window.removeEventListener('pointermove', move); document.documentElement.removeEventListener('pointerleave', leave); window.removeEventListener('blur', leave); };
+    const measure = () => { rect = el.getBoundingClientRect(); };
+    const resize = () => {
+      measure();
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      el.width = Math.max(1, Math.round(rect.width*dpr));
+      el.height = Math.max(1, Math.round(rect.height*dpr));
+      const scale = Math.max(rect.width/1280, rect.height/720)*PORTRAIT_ZOOM;
+      scene = { width:1280*scale, height:720*scale };
+      scene.x = (rect.width-scene.width)/2; scene.y = rect.height-scene.height;
+      draw(last === null ? center : frames.get(last) || center);
+    };
+    const pump = () => {
+      if (disposed || !canAnimate()) { queue.length = 0; pending.clear(); return; }
+      while (activeLoads < 3 && queue.length) {
+        const index = queue.shift(); activeLoads++;
+        load(`/frames/${String(index).padStart(2,'0')}.webp?v=3`).then(img => {
+          if (!disposed) { frames.set(index,img); setReady(true); }
+        }).catch(() => { /* Keep the previous intact pose when a frame fails. */ })
+          .finally(() => { activeLoads--; pending.delete(index); pump(); });
+      }
+    };
+    const requestFrame = index => {
+      if (frames.has(index) || pending.has(index)) return;
+      // Only fetch the current pose and its neighbours; fast pointer movement
+      // replaces stale queued work instead of downloading every frame up front.
+      if (queue.length >= 6) pending.delete(queue.pop());
+      pending.add(index); queue.unshift(index); pump();
+    };
+    const render = time => {
+      raf = 0;
+      if (disposed || !center) return;
+      const dx = point.x-(rect.left+scene.x+scene.width*.5);
+      const dy = point.y-(rect.top+scene.y+scene.height*.43);
+      const active = point.active && canAnimate() && Math.hypot(dx,dy)>Math.min(innerWidth,innerHeight)*.12;
+      if (active) {
+        const target = (Math.atan2(dy,dx)+TAU)%TAU;
+        const delta = lastTime ? Math.min(time-lastTime,50) : 1000/60;
+        angle = lerpAngle(angle,target,1-Math.pow(1-.26,delta/(1000/60)));
+        const index = ((Math.round(angle/TAU*64)%64)+64)%64;
+        requestFrame(index);
+        requestFrame((index+1)%64); requestFrame((index+63)%64);
+        if (frames.has(index) && last !== index) { draw(frames.get(index)); last=index; el.dataset.frame=String(index); }
+        lastTime=time; raf=requestAnimationFrame(render);
+      } else { draw(center); last=null; lastTime=0; el.dataset.frame='center'; }
+    };
+    const wake = () => { if (!raf && center && !disposed) raf=requestAnimationFrame(render); };
+    const cancelWelcome = () => { welcomeCancelled=true; clearTimeout(welcomeTimer); };
+    const leave = () => { el.parentElement.dataset.motion=canAnimate() ? 'on' : 'off'; cancelWelcome(); dragId=null; point.active=false; wake(); };
+    const move = e => {
+      if (!canAnimate() || (e.pointerType !== 'mouse' && e.pointerId !== dragId)) return;
+      cancelWelcome(); point.x=e.clientX; point.y=e.clientY; point.active=true; wake();
+    };
+    const down = e => {
+      if (e.pointerType === 'mouse' || !e.isPrimary || !canAnimate() || e.target.closest('a,button')) return;
+      cancelWelcome(); dragId=e.pointerId;
+      point.x=e.clientX; point.y=e.clientY; point.active=true; wake();
+    };
+    const up = e => { if (e.pointerId === dragId) leave(); };
+    const visibility = () => { if (document.hidden) leave(); };
+    const scroll = () => { measure(); if (!fine.matches) leave(); };
+    const welcome = async () => {
+      if (fine.matches || !canAnimate() || welcomeCancelled || rect.bottom<=0 || rect.top>=innerHeight) return;
+      try {
+        const poses = await Promise.all([0,1,2].map(i=>load(`/frames/${String(i).padStart(2,'0')}.webp?v=3`)));
+        if (disposed || welcomeCancelled || !canAnimate() || document.hidden) return;
+        poses.forEach((img,i)=>frames.set(i,img)); setReady(true);
+        const sequence=[0,1,2,1,0]; let step=0;
+        const glance = () => {
+          if (disposed || welcomeCancelled || !canAnimate()) return;
+          if (step===sequence.length) { draw(center); last=null; el.dataset.frame='center'; return; }
+          last=sequence[step++]; draw(frames.get(last)); el.dataset.frame=String(last);
+          welcomeTimer=setTimeout(glance,140);
+        };
+        glance();
+      } catch { /* A failed welcome pose leaves the static portrait intact. */ }
+    };
+    resize();
+    const observer = new ResizeObserver(resize); observer.observe(el);
+    load('/frames/center.webp?v=3').then(img => { if (!disposed) { center=img; draw(center); el.style.opacity='1'; el.dataset.frame='center'; welcomeTimer=setTimeout(welcome,650); } }).catch(() => { /* The HTML image remains visible if canvas loading fails. */ });
+    hero.addEventListener('pointermove',move,{passive:true});
+    hero.addEventListener('pointerdown',down,{passive:true});
+    window.addEventListener('pointerup',up);
+    window.addEventListener('pointercancel',up);
+    el.closest('.hero').addEventListener('pointerleave',leave);
+    window.addEventListener('blur',leave);
+    window.addEventListener('scroll',scroll,{passive:true});
+    document.addEventListener('visibilitychange',visibility);
+    reduced.addEventListener('change',leave); fine.addEventListener('change',leave);
+    return () => { disposed=true; clearTimeout(welcomeTimer); cancelAnimationFrame(raf); observer.disconnect(); queue.length=0; el.closest('.hero')?.removeEventListener('pointermove',move); el.closest('.hero')?.removeEventListener('pointerleave',leave); window.removeEventListener('blur',leave); window.removeEventListener('scroll',scroll); hero.removeEventListener('pointerdown',down); window.removeEventListener('pointerup',up); window.removeEventListener('pointercancel',up); document.removeEventListener('visibilitychange',visibility); reduced.removeEventListener('change',leave); fine.removeEventListener('change',leave); };
   }, []);
-  return <div className="portrait"><canvas ref={canvas} role="img" aria-label="An interactive portrait that follows your cursor"/><span className="portrait-note"><span className={ready ? 'status ready' : 'status'}/>{ready ? 'A little curious. Just like you.' : 'Getting acquainted…'}</span></div>;
+  return <div className="portrait"><img className="portrait-fallback" src="/frames/center.webp?v=3" alt="" fetchPriority="high" width="1280" height="720"/><canvas ref={canvas} role="img" aria-label="Portrait of Courage Agbavor"/><span className="portrait-note"><span className={ready ? 'status ready' : 'status'}/><span className="portrait-desktop-note">{ready ? 'A little curious. Just like you.' : 'A builder. A curious mind.'}</span><span className="portrait-touch-note">Drag to look around ↔</span></span></div>;
 }
 
 

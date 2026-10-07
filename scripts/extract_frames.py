@@ -50,8 +50,8 @@ out.mkdir(exist_ok=True)
 def save(im, name):
     im = flatten(im)
     # Preserve the full scene for viewport-cover rendering at every aspect ratio.
-    im = cv2.resize(im, (1536,864), interpolation=cv2.INTER_AREA)
-    Image.fromarray(im).save(out / name, 'WEBP', lossless=True, method=4)
+    im = cv2.resize(im, (1280,720), interpolation=cv2.INTER_AREA)
+    Image.fromarray(im).save(out / name, 'WEBP', quality=90, method=4)
 
 anchors = [75,96,121,148,175,200,24,48,75]
 mapping = []
@@ -67,7 +67,7 @@ for i in range(64):
 save(source[239], 'center.webp')
 manifest = {'source': {'frames':count,'fps':fps,'duration':count/fps},
     'background':bg,'backgroundRGB':rgb.tolist(),'poses':poses,
-    'frameMap':mapping,'dimensions':[1536,864],'faceCenter':[.5,.43],
+    'frameMap':mapping,'dimensions':[1280,720],'faceCenter':[.5,.43],
     'note':'Source is not a closed loop; UP-LEFT to UP uses the nearest available poses.'}
 (out / 'manifest.json').write_text(json.dumps(manifest,indent=2))
 (root / 'src/portrait.css').write_text(f':root{{--portrait-bg:{bg};--portrait-ratio:1;}}\n')
