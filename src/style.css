@@ -21,3 +21,12 @@
 #work .project-image{aspect-ratio:1.55}
 #work .project h3{font-size:clamp(20px,2vw,26px)}
 @media(max-width:620px){#work .project-grid{gap:34px}#work .project-image{aspect-ratio:1.45}}
+/* Mobile gives the portrait more breathing room and keeps the first screen easy to scan. */
+@media(max-width:620px){
+  .portrait-fallback{width:max(60vw,calc(max(100svh,740px) * 1.06666667))}
+  .hero-copy{left:7%;right:7%;bottom:86px;max-width:none}
+  .hero-copy .bio{max-width:320px}
+  .hero-shade{background:linear-gradient(180deg,rgba(41,0,0,.12) 0%,transparent 30%),linear-gradient(0deg,#220000e8 0%,#22000096 32%,transparent 65%)}
+  .portrait-note{top:82px;padding:8px 12px;border:1px solid #ffffff30;border-radius:999px;background:#67000033;backdrop-filter:blur(8px)}
+  .scroll-cue{bottom:18px}
+}

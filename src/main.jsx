@@ -60,6 +60,8 @@ function Portrait() {
     const point = { x: 0, y: 0, active: false };
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     const fine = matchMedia('(hover: hover) and (pointer: fine)');
+    const mobile = matchMedia('(max-width: 620px)');
+    const portraitZoom = () => mobile.matches ? 0.60 : PORTRAIT_ZOOM;
     const connection = navigator.connection;
     const canAnimate = () => !reduced.matches && !connection?.saveData;
     el.parentElement.dataset.motion=canAnimate() ? 'on' : 'off';
@@ -72,7 +74,7 @@ function Portrait() {
     const draw = img => {
       if (!img || !scene) return;
       ctx.fillStyle = '#e00907'; ctx.fillRect(0, 0, el.width, el.height);
-      const scale = Math.max(el.width / img.width, el.height / img.height) * PORTRAIT_ZOOM;
+      const scale = Math.max(el.width / img.width, el.height / img.height) * portraitZoom();
       const w = img.width * scale, h = img.height * scale;
       ctx.drawImage(img, (el.width-w)/2, el.height-h, w, h);
     };
@@ -82,7 +84,7 @@ function Portrait() {
       const dpr = Math.min(devicePixelRatio || 1, 2);
       el.width = Math.max(1, Math.round(rect.width*dpr));
       el.height = Math.max(1, Math.round(rect.height*dpr));
-      const scale = Math.max(rect.width/1280, rect.height/720)*PORTRAIT_ZOOM;
+      const scale = Math.max(rect.width/1280, rect.height/720)*portraitZoom();
       scene = { width:1280*scale, height:720*scale };
       scene.x = (rect.width-scene.width)/2; scene.y = rect.height-scene.height;
       draw(last === null ? center : frames.get(last) || center);
@@ -163,8 +165,8 @@ function Portrait() {
     window.addEventListener('blur',leave);
     window.addEventListener('scroll',scroll,{passive:true});
     document.addEventListener('visibilitychange',visibility);
-    reduced.addEventListener('change',leave); fine.addEventListener('change',leave);
-    return () => { disposed=true; clearTimeout(welcomeTimer); cancelAnimationFrame(raf); observer.disconnect(); queue.length=0; el.closest('.hero')?.removeEventListener('pointermove',move); el.closest('.hero')?.removeEventListener('pointerleave',leave); window.removeEventListener('blur',leave); window.removeEventListener('scroll',scroll); hero.removeEventListener('pointerdown',down); window.removeEventListener('pointerup',up); window.removeEventListener('pointercancel',up); document.removeEventListener('visibilitychange',visibility); reduced.removeEventListener('change',leave); fine.removeEventListener('change',leave); };
+    reduced.addEventListener('change',leave); fine.addEventListener('change',leave); mobile.addEventListener('change',resize);
+    return () => { disposed=true; clearTimeout(welcomeTimer); cancelAnimationFrame(raf); observer.disconnect(); queue.length=0; el.closest('.hero')?.removeEventListener('pointermove',move); el.closest('.hero')?.removeEventListener('pointerleave',leave); window.removeEventListener('blur',leave); window.removeEventListener('scroll',scroll); hero.removeEventListener('pointerdown',down); window.removeEventListener('pointerup',up); window.removeEventListener('pointercancel',up); document.removeEventListener('visibilitychange',visibility); reduced.removeEventListener('change',leave); fine.removeEventListener('change',leave); mobile.removeEventListener('change',resize); };
   }, []);
   return <div className="portrait"><img className="portrait-fallback" src={assetUrl('frames/center.webp?v=3')} alt="" fetchPriority="high" width="1280" height="720"/><canvas ref={canvas} role="img" aria-label="Portrait of Courage Agbavor"/><span className="portrait-note"><span className={ready ? 'status ready' : 'status'}/><span className="portrait-desktop-note">{ready ? 'A little curious. Just like you.' : 'A builder. A curious mind.'}</span><span className="portrait-touch-note">Drag to look around ↔</span></span></div>;
 }
