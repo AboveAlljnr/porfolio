@@ -46,6 +46,8 @@ Build command: `npm run build`; output directory: `dist`.
 
 A branded 1200 × 630 PNG is included at `/social-preview.png`, with editable SVG source alongside it. Once the final site address is known, set `og:image` and `twitter:image` to its absolute HTTPS image URL and add `og:url` and a canonical URL. Do not use the localhost address.
 
+The favicon is declared in `index.html` as `favicon.ico` (16/32/48), `favicon-16x16.png`, `favicon-32x32.png`, `favicon-96x96.png`, `apple-touch-icon.png`, the SVG at `public/favicon.svg`, and `public/site.webmanifest`. Google Search accepts only raster icons (BMP, GIF, ICO, PNG, JPEG, PPM, TIFF) and ignores SVG, so the raster files are what make the logo appear in search results; the SVG only covers browser tabs. Regenerate the raster set after changing the mark with `python scripts/make_icons.py` (Pillow only). After deploying, request indexing for the homepage in Google Search Console; a search-result favicon is set per hostname and can take days to appear.
+
 Email copying, keyboard focus, internal targets, and mouse-triggered portrait loading were checked in the browser. A reliable phone-sized screenshot could not be captured with this browser session; verify 320–430 px widths on a phone before deployment. Confirm education, experience, and project stack details personally; supply an actual resume PDF before adding a download.
 
 
