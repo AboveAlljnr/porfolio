@@ -7,6 +7,11 @@ import { projects, expertise } from './content.jsx';
 const TAU = Math.PI * 2;
 const assetUrl = path => `${import.meta.env.BASE_URL}${path}`;
 const PORTRAIT_ZOOM = 0.70;
+// Idle blink: open -> half -> closed -> half -> open. The open pose reuses the
+// neutral frame, so only the two in-between portraits are extra assets.
+const BLINK_SOURCES = ['frames/blink/half.webp', 'frames/blink/closed.webp'];
+const BLINK_STEP_MS = 70;
+const BLINK_DELAY_MIN = 3200, BLINK_DELAY_MAX = 6400;
 export const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b-a), Math.cos(b-a)) * t;
 
 function MagneticCursor() {
@@ -54,7 +59,8 @@ function Portrait() {
     if (!ctx) return;
     let disposed = false, raf = 0, rect, scene, center, last = null, angle = 0, lastTime = 0;
     let activeLoads = 0, dragId = null, welcomeTimer = 0;
-    let welcomeCancelled = false;
+    let welcomeCancelled = false, blinkTimer = 0, blinkReady = false;
+    const blinkFrames = [];
     const hero = el.closest('.hero');
     const frames = new Map(), pending = new Set(), queue = [];
     const point = { x: 0, y: 0, active: false };
@@ -121,24 +127,46 @@ function Portrait() {
         requestFrame((index+1)%64); requestFrame((index+63)%64);
         if (frames.has(index) && last !== index) { draw(frames.get(index)); last=index; el.dataset.frame=String(index); }
         lastTime=time; raf=requestAnimationFrame(render);
-      } else { draw(center); last=null; lastTime=0; el.dataset.frame='center'; }
+      } else { draw(center); last=null; lastTime=0; el.dataset.frame='center'; scheduleBlink(); }
     };
     const wake = () => { if (!raf && center && !disposed) raf=requestAnimationFrame(render); };
     const cancelWelcome = () => { welcomeCancelled=true; clearTimeout(welcomeTimer); };
-    const leave = () => { el.parentElement.dataset.motion=canAnimate() ? 'on' : 'off'; cancelWelcome(); dragId=null; point.active=false; wake(); };
+    const stopBlink = () => { clearTimeout(blinkTimer); blinkTimer = 0; };
+    const scheduleBlink = () => {
+      if (disposed || blinkTimer || !blinkReady || !canAnimate()) return;
+      blinkTimer = setTimeout(runBlink, BLINK_DELAY_MIN + Math.random()*(BLINK_DELAY_MAX-BLINK_DELAY_MIN));
+    };
+    const runBlink = () => {
+      blinkTimer = 0;
+      // Only blink while genuinely idle: not rotating, not mid-welcome, and
+      // still resting on the neutral pose.
+      if (disposed || !blinkReady || !canAnimate() || document.hidden || raf || last !== null || welcomeTimer) { scheduleBlink(); return; }
+      const sequence = [blinkFrames[0], blinkFrames[1], blinkFrames[0]];
+      let step = 0;
+      const frame = () => {
+        blinkTimer = 0;
+        if (disposed) return;
+        if (step === sequence.length) { draw(center); last=null; el.dataset.frame='center'; scheduleBlink(); return; }
+        draw(sequence[step]); el.dataset.frame=`blink-${step}`; step++;
+        blinkTimer = setTimeout(frame, BLINK_STEP_MS);
+      };
+      frame();
+    };
+    const leave = () => { el.parentElement.dataset.motion=canAnimate() ? 'on' : 'off'; cancelWelcome(); stopBlink(); dragId=null; point.active=false; wake(); };
     const move = e => {
       if (!canAnimate() || (e.pointerType !== 'mouse' && e.pointerId !== dragId)) return;
-      cancelWelcome(); point.x=e.clientX; point.y=e.clientY; point.active=true; wake();
+      cancelWelcome(); stopBlink(); point.x=e.clientX; point.y=e.clientY; point.active=true; wake();
     };
     const down = e => {
       if (e.pointerType === 'mouse' || !e.isPrimary || !canAnimate() || e.target.closest('a,button')) return;
-      cancelWelcome(); dragId=e.pointerId;
+      cancelWelcome(); stopBlink(); dragId=e.pointerId;
       point.x=e.clientX; point.y=e.clientY; point.active=true; wake();
     };
     const up = e => { if (e.pointerId === dragId) leave(); };
     const visibility = () => { if (document.hidden) leave(); };
     const scroll = () => { measure(); if (!fine.matches) leave(); };
     const welcome = async () => {
+      welcomeTimer = 0;
       if (fine.matches || !canAnimate() || welcomeCancelled || rect.bottom<=0 || rect.top>=innerHeight) return;
       try {
         const poses = await Promise.all([0,1,2].map(i=>load(assetUrl(`frames/${String(i).padStart(2,'0')}.webp?v=3`))));
@@ -147,7 +175,7 @@ function Portrait() {
         const sequence=[0,1,2,1,0]; let step=0;
         const glance = () => {
           if (disposed || welcomeCancelled || !canAnimate()) return;
-          if (step===sequence.length) { draw(center); last=null; el.dataset.frame='center'; return; }
+          if (step===sequence.length) { draw(center); last=null; el.dataset.frame='center'; welcomeTimer=0; scheduleBlink(); return; }
           last=sequence[step++]; draw(frames.get(last)); el.dataset.frame=String(last);
           welcomeTimer=setTimeout(glance,140);
         };
@@ -157,6 +185,10 @@ function Portrait() {
     resize();
     const observer = new ResizeObserver(resize); observer.observe(el);
     load(assetUrl('frames/center.webp?v=3')).then(img => { if (!disposed) { center=img; draw(center); el.style.opacity='1'; el.dataset.frame='center'; welcomeTimer=setTimeout(welcome,650); } }).catch(() => { /* The HTML image remains visible if canvas loading fails. */ });
+    if (canAnimate()) Promise.all(BLINK_SOURCES.map(src => load(assetUrl(`${src}?v=1`)))).then(images => {
+      if (disposed) return;
+      blinkFrames.push(...images); blinkReady = true; scheduleBlink();
+    }).catch(() => { /* Without blink art the portrait simply stays still. */ });
     hero.addEventListener('pointermove',move,{passive:true});
     hero.addEventListener('pointerdown',down,{passive:true});
     window.addEventListener('pointerup',up);
@@ -166,7 +198,7 @@ function Portrait() {
     window.addEventListener('scroll',scroll,{passive:true});
     document.addEventListener('visibilitychange',visibility);
     reduced.addEventListener('change',leave); fine.addEventListener('change',leave); mobile.addEventListener('change',resize);
-    return () => { disposed=true; clearTimeout(welcomeTimer); cancelAnimationFrame(raf); observer.disconnect(); queue.length=0; el.closest('.hero')?.removeEventListener('pointermove',move); el.closest('.hero')?.removeEventListener('pointerleave',leave); window.removeEventListener('blur',leave); window.removeEventListener('scroll',scroll); hero.removeEventListener('pointerdown',down); window.removeEventListener('pointerup',up); window.removeEventListener('pointercancel',up); document.removeEventListener('visibilitychange',visibility); reduced.removeEventListener('change',leave); fine.removeEventListener('change',leave); mobile.removeEventListener('change',resize); };
+    return () => { disposed=true; clearTimeout(welcomeTimer); clearTimeout(blinkTimer); cancelAnimationFrame(raf); observer.disconnect(); queue.length=0; el.closest('.hero')?.removeEventListener('pointermove',move); el.closest('.hero')?.removeEventListener('pointerleave',leave); window.removeEventListener('blur',leave); window.removeEventListener('scroll',scroll); hero.removeEventListener('pointerdown',down); window.removeEventListener('pointerup',up); window.removeEventListener('pointercancel',up); document.removeEventListener('visibilitychange',visibility); reduced.removeEventListener('change',leave); fine.removeEventListener('change',leave); mobile.removeEventListener('change',resize); };
   }, []);
   return <div className="portrait"><img className="portrait-fallback" src={assetUrl('frames/center.webp?v=3')} alt="" fetchPriority="high" width="1280" height="720"/><canvas ref={canvas} role="img" aria-label="Portrait of Courage Agbavor"/><span className="portrait-note"><span className={ready ? 'status ready' : 'status'}/><span className="portrait-desktop-note">{ready ? 'A little curious. Just like you.' : 'A builder. A curious mind.'}</span><span className="portrait-touch-note">Drag to look around ↔</span></span></div>;
 }
@@ -186,7 +218,7 @@ function App() {
   return <><a className="skip-link" href="#main">Skip to content</a><MagneticCursor/><header className="floating-header"><nav aria-label="Main navigation"><a href="#work">WORK</a><a href="#about">ABOUT</a><a href="#contact">CONTACT <span>↗</span></a></nav></header>
     <main id="main"><section id="top" className="hero" aria-labelledby="hero-title"><Portrait/><div className="hero-shade" aria-hidden="true"/><a className="monogram" href="#top" aria-label="Above All home">A<span>A</span></a><span className="availability"><i/> ACCRA, GHANA · AVAILABLE WORLDWIDE</span>
     <div className="hero-copy"><p className="intro">Hi, I’m</p><h1 id="hero-title">Courage<span>.</span></h1><p className="hero-identity">COURAGE AGBAVOR / ABOVE ALL</p><p className="bio">A Full-Stack Developer & Operations Specialist.<br className="desktop-break"/> I build thoughtful web experiences and make<br className="desktop-break"/> complex systems feel simple.</p><div className="hero-actions"><a className="pill solid" href="#work">Selected work <span aria-hidden="true">↘</span></a><a className="pill glass" href="#contact">Let’s Talk <span aria-hidden="true">↗</span></a></div></div><a className="scroll-cue" href="#work"><span>SCROLL TO EXPLORE</span><span aria-hidden="true">↓</span></a><span className="hero-edition">PORTFOLIO / 2026</span></section>
-    <section id="work" className="content-section"><span className="section-label">01 / SELECTED WORK</span><div className="section-heading"><h2>Ideas, out in the world.</h2><p>A selection of websites and digital experiences I’ve brought to life.</p></div><div className="project-grid">{projects.map((project, index) => <article className="project" key={project.url}><a className="project-image" href={project.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${project.title} (opens in a new tab)`}><img src={assetUrl(`projects/${project.image}`)} alt={`Screenshot of ${project.title}`} loading="lazy" decoding="async"/><span className="project-visit">View live site ↗</span></a><div className="project-meta"><span>0{index + 1} / {project.category}</span><span>2025</span></div><h3><a href={project.url} target="_blank" rel="noopener noreferrer">{project.title} <span aria-hidden="true">↗</span><span className="sr-only"> (opens in a new tab)</span></a></h3><p>{project.description}</p><ul className="project-tags" aria-label="Technologies">{project.stack.map(tool => <li key={tool}>{tool}</li>)}</ul></article>)}</div></section>
+    <section id="work" className="content-section"><span className="section-label">01 / SELECTED WORK</span><div className="section-heading"><h2>Ideas, out in the world.</h2><p>A selection of websites and digital experiences I’ve brought to life.</p></div><div className="project-grid">{projects.map((project, index) => <article className="project" key={project.url}><a className="project-image" href={project.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${project.title} (opens in a new tab)`}><img src={assetUrl(`projects/${project.image}`)} alt={`Screenshot of ${project.title}`} loading="lazy" decoding="async"/><span className="project-visit">View live site ↗</span></a><div className="project-meta"><span>0{index + 1} / {project.category}</span><span>{project.year || '2025'}</span></div><h3><a href={project.url} target="_blank" rel="noopener noreferrer">{project.title} <span aria-hidden="true">↗</span><span className="sr-only"> (opens in a new tab)</span></a></h3><p>{project.description}</p><ul className="project-tags" aria-label="Technologies">{project.stack.map(tool => <li key={tool}>{tool}</li>)}</ul></article>)}</div></section>
     <section id="about" className="content-section about"><span className="section-label">02 / ABOUT</span><div className="about-grid"><div><h2>A builder’s mindset.<br/>An eye for the whole system.</h2><p>I’m Courage Agbavor, also known as Above All, a developer and operations thinker based in Accra, Ghana. I connect thoughtful interfaces with the systems and processes that make them work.</p><p>My work spans web development, business operations, and practical automation—from a storefront’s first impression to the information moving behind the scenes.</p><a className="text-link" href="https://github.com/AboveAlljnr" target="_blank" rel="noopener noreferrer">Explore my GitHub <span aria-hidden="true">↗</span><span className="sr-only"> (opens in a new tab)</span></a></div><div className="background"><h3>Experience & education</h3><article><span className="section-label">DEVELOPMENT</span><h4>Freelance / Independent Projects</h4><p>Full-stack web applications, e-commerce, dashboards, and internal tools.</p></article><article><span className="section-label">OPERATIONS</span><h4>Systems & process improvement</h4><p>Business workflows, ERP integrations, automation, and reporting.</p></article><article><span className="section-label">EDUCATION</span><h4>IPMC College of Technology</h4><p>NCC Education Level 5 Diploma in Computing with Business Management.</p></article></div></div></section>
     <section id="expertise" className="content-section"><span className="section-label">03 / EXPERTISE</span><h2>Built with purpose.</h2><div className="expertise-grid">{expertise.map((item, index) => <article key={item.title}><span className="section-label">0{index + 1}</span><h3>{item.title}</h3><p>{item.description}</p><span className="expertise-tools">{item.tools}</span></article>)}</div></section>
     <section id="contact" className="content-section contact"><span className="section-label">04 / CONTACT</span><h2>Have an idea?<br/><em>Let’s make it happen.</em></h2><p>For a new website, a better system, or your next collaboration—get in touch.</p><div className="contact-actions"><a className="contact-email" href={`mailto:${email}`}>{email} <span aria-hidden="true">↗</span></a><button className="pill glass" type="button" onClick={copyEmail}>Copy email</button></div><p className="copy-status" role="status">{copyStatus}</p><div className="social-links"><a href="https://github.com/AboveAlljnr" target="_blank" rel="noopener noreferrer">GitHub ↗<span className="sr-only"> (opens in a new tab)</span></a><a href="https://linkedin.com/in/courage-agbavor-5a1552349" target="_blank" rel="noopener noreferrer">LinkedIn ↗<span className="sr-only"> (opens in a new tab)</span></a></div><footer>© {new Date().getFullYear()} COURAGE AGBAVOR<span>ABOVE ALL / ACCRA, GHANA</span><a href="#top">BACK TO TOP ↑</a></footer></section></main></>;
